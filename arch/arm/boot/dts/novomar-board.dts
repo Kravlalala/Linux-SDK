@@ -1,0 +1,135 @@
+/*
+ * Copyright (C) 2016-2017 Novomar Incorporated - http://www.novomar-spb.ru/
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2 as
+ * published by the Free Software Foundation.
+ */
+#include "am57xx-beagle-x15-reg.dts"
+#include "novomar-board-common.dtsi"
+
+/ {
+
+};
+
+&dra7_pmx_core {
+
+	/* UART pins */
+	uart5_pins_default: uart5_pins_default {
+		pinctrl-single,pins = <
+			0x384 (PIN_INPUT_PULLUP | MUX_MODE2) /* mmc3_dat1.uart5_rxd (ball AC7) */
+			0x388 (PIN_OUTPUT | MUX_MODE2) /* mmc3_dat1.uart5_txd (ball AC6) */
+		>;
+	};
+
+	
+	/* GPIO pins */
+	gpio3_pins_default: gpio3_pins_default {
+		pinctrl-single,pins = <
+			0x124 (PIN_OUTPUT | MUX_MODE14) /* vin1a_d12.gpio3_16 (ball AF2) */
+			0x134 (PIN_OUTPUT | MUX_MODE14) /* vin1a_d16.gpio3_20 (ball AF1) */
+			0x110 (PIN_OUTPUT | MUX_MODE14) /* vin1a_d7.gpio3_11 (ball AH4) */
+			0x104 (PIN_OUTPUT | MUX_MODE14) /* vin1a_d4.gpio3_8 (ball AH3) */
+		>;
+	};
+
+	/* SPI pins  */
+
+	/* spi2 */
+	spi2_pins_default: spi2_pins_default {
+		pinctrl-single,pins = <
+			0x3bc (PIN_OUTPUT_PULLUP | MANUAL_MODE | MUX_MODE3) /* spi1_cs3.spi2_cs3  (ball B20) */
+			0x3c0 (PIN_INPUT_PULLUP | MANUAL_MODE | MUX_MODE0) /* spi2_sclk.spi2_sclk (ball A26) */
+			0x3c4 (PIN_INPUT_PULLUP | MANUAL_MODE | MUX_MODE0) /* spi2_d1.spi2_d1 (ball B22) */
+			0x3c8 (PIN_OUTPUT_PULLUP | MANUAL_MODE | MUX_MODE0) /* spi2_d0.spi2_d0 (ball G17) */
+			/* GPIO 5_19 as CS */
+			0x24c (PIN_OUTPUT_PULLUP | MUX_MODE14)	 /* uart3_txd.gpio5_19 (ball Y1)*/
+		>;
+	};
+
+	/* I2C pins  */
+
+	/* i2c3 */
+	i2c3_pins_default: i2c3_pins_default {
+		pinctrl-single,pins = <
+			0x2a4 (PIN_INPUT | MUX_MODE10) /* mcasp1_aclkx.i2c3_sda (ball C14) */
+			0x2a8 (PIN_INPUT | MUX_MODE10) /* mcasp1_fsx.i2c3_scl (ball D14) */
+		>;
+	};
+
+	/* i2c4 */
+	i2c4_pins_default: i2c4_pins_default {
+		pinctrl-single,pins = <
+			0x36c (PIN_INPUT | MUX_MODE4) /* mmc1_sdcd.i2c4_sda (ball W7) */
+			0x370 (PIN_INPUT | MUX_MODE4) /* mmc1_sdwp.i2c4_scl (ball Y9) */
+		>;
+	};
+	/* i2c5 */
+	i2c5_pins_default: i2c5_pins_default {
+		pinctrl-single,pins = <
+			0x2b4 (PIN_INPUT | MUX_MODE10) /* mcasp1_axr0.i2c5_sda (ball G12) */
+			0X2b8 (PIN_INPUT | MUX_MODE10) /* mcasp_axr1.i2c5_scl (ball F12) */
+		>;
+	};
+
+	/* Right tlv320adc3101 */
+	mcasp8_pins_default: msasp8_pins_default{
+		pinctrl-single,pins = <
+			
+			//0x2a0 (PIN_OUTPUT | MUX_MODE4) /* xref_clk3.mcasp8_hclk (ball C23) */
+			0x314 (PIN_INPUT | MUX_MODE1) /* mcasp2_axr4.mcasp8_axr0 (ball D15) */
+			0x31c (PIN_INPUT | MUX_MODE2) /* mcasp2_axr6.mcasp8_aclkr (ball B17 ) */
+			0x320 (PIN_INPUT | MUX_MODE2) /* mcasp2_axr7.mcasp8_fsr (ball A17) */
+		>;
+	};
+
+	/* pcm1862 */
+	mcasp5_pins_default: mcasp5_pins_default {
+		pinctrl-single,pins = <
+			0x294 (PIN_OUTPUT | MUX_MODE4) /* xref_clk0.mcasp5_hclk (ball D18) */
+			0x344 (PIN_INPUT | MUX_MODE1) /* mcasp5_aclkx.mcasp5_aclkr (ball AA3) */
+			0x348 (PIN_INPUT | MUX_MODE1) /* mcasp5_fsx.mcasp5_fsr (ball AB9) */
+			0x350 (PIN_INPUT | MUX_MODE0) /* mcasp5_axr1.mcasp5_axr1 (ball AA4) */
+		>;
+	};
+
+	/* pcm5102 */
+	mcasp6_pins_default: mcasp6_pins_default {
+		pinctrl-single,pins = <
+			0x298 (PIN_OUTPUT | MUX_MODE4) /* xref_clk1.mcasp6_hclk (ball E17) */
+			0x2d8 (PIN_OUTPUT | MUX_MODE1) /* mcasp1_axr9.mcasp6_axr1 ( ball A11) */
+			0x2dc (PIN_OUTPUT | MUX_MODE1) /* mcasp1_axr10.mcasp6_aclkx (ball B13)*/
+			0x2e0 (PIN_OUTPUT | MUX_MODE1) /* mcasp1_axr11.mcasp6_fsx (ball A12) */
+		>;
+	};
+
+	/* Vip2 pins*/
+
+	/* vin3a */
+	vin3a_pins_default: vin3a_pins_default {
+		pinctrl-single,pins = <
+			0x000 (PIN_INPUT | MUX_MODE2) /* gpmc_ad0.vin3a_d0 (ball M6) */
+			0x004 (PIN_INPUT | MUX_MODE2) /* gpmc_ad1.vin3a_d1 (ball M2) */
+			0x008 (PIN_INPUT | MUX_MODE2) /* gpmc_ad2.vin3a_d2 (ball L5) */
+			0x00c (PIN_INPUT | MUX_MODE2) /* gpmc_ad3.vin3a_d3 (ball M1) */
+			0x010 (PIN_INPUT | MUX_MODE2) /* gpmc_ad4.vin3a_d4 (ball L6) */
+			0x014 (PIN_INPUT | MUX_MODE2) /* gpmc_ad5.vin3a_d5 (ball L4) */
+			0x018 (PIN_INPUT | MUX_MODE2) /* gpmc_ad6.vin3a_d6 (ball L3) */
+			0x01c (PIN_INPUT | MUX_MODE2) /* gpmc_ad7.vin3a_d7 (ball L2) */
+			0x060 (PIN_INPUT | MUX_MODE2) /* gpmc_a8.vin3a_hsync0 (ball N7) */
+			0x064 (PIN_INPUT | MUX_MODE2) /* gpmc_a9.vin3a_vsync0 (ball R4) */
+			0x0bc (PIN_INPUT | MUX_MODE2) /* gpmc_cs3.vin3a_clk0 (ball P1) */
+		>;
+	};
+
+	/* Sata pins  */
+	sata_pins_default: sata_pins_default {
+		pinctrl-single,pins = <
+			0x3d4 (PIN_OUTPUT | MUX_MODE4) /* dcan1_rx.sata1_led (ball G19) */
+		>;
+	};
+	
+
+};
+
+#include "am57xx-evm-cmem.dtsi"

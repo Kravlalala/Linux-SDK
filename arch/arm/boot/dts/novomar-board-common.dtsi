@@ -1,0 +1,256 @@
+/*
+ * Copyright (C) 2016-2017 Novomar Incorporated - http://www.novomar-spb.ru/
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2 as
+ * published by the Free Software Foundation.
+ */
+
+/ {
+	compatible = "ti,am5728-evm", "ti,am572x-beagle-x15", "ti,am5728", "ti,dra742", "ti,dra74", "ti,dra7";	
+
+	/* Novomar bindings */
+	leds {
+		compatible = "gpio-leds";
+		led@0 {
+			label = "VD1:AH3";
+			gpios = <&gpio3 16 GPIO_ACTIVE_HIGH>;
+			linux,default-trigger = "heartbeat";
+			default-state = "off";
+		};
+
+		led@1 {
+			label = "VD2:AF1";
+			gpios = <&gpio3 20 GPIO_ACTIVE_LOW>;
+			linux,default-trigger = "cpu0";
+			default-state = "off";
+		};
+
+		led@2 {
+			label = "VD3:AH4";
+			gpios = <&gpio3 11 GPIO_ACTIVE_LOW>;
+			linux,default-trigger = "mmc2";
+			default-state = "off";
+		};
+
+		led@3 {
+			label = "VD4:AH3";
+			gpios = <&gpio3 8 GPIO_ACTIVE_LOW>;
+			linux,default-trigger = "heartbeat";
+			default-state = "on";
+		};
+	};
+
+	/* PCM5102a codec */
+	pcm5102a: pcm5102a {
+		#sound-dai-cells = <0>;
+		compatible = "ti,pcm5102a";
+	};
+
+	/* Left microphone */
+	left_mic: sound@0 {
+		compatible = "simple-audio-card";
+		simple-audio-card,name = "LMicrophone";
+		simple-audio-card,widgets =
+			"Line", "Line In";
+		simple-audio-card,routing =
+			"IN1_L",	"Line In",
+			"IN1_R",	"Line In";
+		simple-audio-card,format = "i2s";
+		simple-audio-card,bitclock-master = <&sound0_codec>;
+		simple-audio-card,frame-master = <&sound0_codec>;
+
+		sound0_cpu: simple-audio-card,cpu {
+			sound-dai = <&mcasp8>;
+			system-clock-direction = "out";
+		};
+
+		sound0_codec: simple-audio-card,codec {
+			sound-dai = <&codec0>;
+		};
+	};
+
+	/* Right microphone */
+	right_mic: sound@1 {
+		compatible = "simple-audio-card";
+		simple-audio-card,name = "RMicrophone";
+		simple-audio-card,widgets =
+			"Line", "Line In";
+		simple-audio-card,routing =
+			"IN1_L",	"Line In",
+			"IN1_R",	"Line In";
+		simple-audio-card,format = "i2s";
+		simple-audio-card,bitclock-master = <&sound1_codec>;
+		simple-audio-card,frame-master = <&sound1_codec>;
+
+		sound1_cpu: simple-audio-card,cpu {
+			sound-dai = <&mcasp4>;
+			system-clock-direction = "out";
+		};
+
+		sound1_codec: simple-audio-card,codec {
+			sound-dai = <&codec1>;
+		};
+	};
+
+	/* Audio output */
+	playback_card:sound@2 {
+	  compatible = "simple-audio-card";
+	  simple-audio-card,name = "PCM5102a";
+	  simple-audio-card,format = "i2s";
+	  simple-audio-card,cpu {
+	    sound-dai = <&mcasp6>;
+	    bitclock-master;
+	    bitclock-inversion;
+	    frame-master;
+	    system-clock-frequency = <24576000>;
+	    system-clock-direction = "out";
+	  };
+
+	  simple-audio-card,codec {
+	    sound-dai = <&pcm5102a>;  
+	  };
+	  
+	};
+
+};
+
+/* UART nodes */
+&uart5 {
+	status = "okay";
+	pinctrl-names = "default";
+	pinctrl-0 = <&uart5_pins_default>;
+};
+
+/* GPIO nodes */
+&gpio3 {
+	pinctrl-names = "default";
+	pinctrl-0 = <&gpio3_pins_default>;
+	ti,no-reset-on-init;
+	ti,no-idle-on-init;
+};
+
+
+/* SPI nodes  */
+&mcspi2{
+	status = "okay";
+	#address-cells = <1>;
+    #size-cells = <0>;
+	pinctrl-names = "default";
+	pinctrl-0 = <&spi2_pins_default>;
+
+	ti,spi-num-cs = <4>;
+	ti,pindir-d0-out-d1-in;
+
+	cs-gpios = <0>, <0>, <&gpio5 19 0>, <0>;
+
+	spidev@0{
+		#address-cells = <1>;
+		#size-cells = <0>;
+		compatible = "rohm,dh2228fv";
+		reg = <0>;
+		//spi-cs-high;
+		spi-max-frequency = <24000000>;
+	};
+	spidev@1{
+		#address-cells = <1>;
+		#size-cells = <0>;
+		compatible = "rohm,dh2228fv";
+		reg = <1>;
+		//spi-cs-high;
+		spi-max-frequency = <24000000>;
+	};
+	spidev@2{
+		#address-cells = <1>;
+		#size-cells = <0>;
+		compatible = "rohm,dh2228fv";
+		reg = <2>;
+		//spi-cs-high;
+		spi-max-frequency = <24000000>;
+	};
+	spidev@3{
+		#address-cells = <1>;
+		#size-cells = <0>;
+		compatible = "rohm,dh2228fv";
+		reg = <3>;
+		//spi-cs-high;
+		spi-max-frequency = <24000000>;
+	};
+};
+
+&i2c3 {
+	clock-frequency = <400000>;
+	pinctrl-names = "default";
+	pinctrl-0 = <&i2c3_pins_default>;
+	status = "okay";
+};
+
+/* General purpose i2c bus */
+&i2c5 {
+	clock-frequency = <400000>;
+	pinctrl-names = "default";
+	pinctrl-0 = <&i2c5_pins_default>;
+	status = "okay";
+};
+
+/* McASP nodes  */
+&mcasp5 {
+	#sound-dai-cells = <0>;
+	assigned-clocks = <&mcasp5_ahclkx_mux>;
+	assigned-clock-parents = <&sys_clkin2>;
+	pinctrl-names = "default"; 
+	pinctrl-0 = <&mcasp5_pins_default>; 
+	status = "okay";
+
+	op-mode = <0>;	/* MCASP_IIS_MODE */
+	tdm-slots = <2>;
+	/* 4 serializers */
+	serial-dir = <	/* 0: INACTIVE, 1: TX, 2: RX */
+		0 2 0 0
+	>;
+	tx-num-evt = <32>;
+	rx-num-evt = <32>;
+};
+
+&mcasp6 {
+	#sound-dai-cells = <0>;
+	assigned-clocks = <&abe_dpll_sys_clk_mux>;
+	assigned-clock-parents = <&sys_clkin2>;
+	pinctrl-names = "default"; 
+	pinctrl-0 = <&mcasp6_pins_default>;
+	status = "okay";
+
+	op-mode = <0>;	/* MCASP_IIS_MODE */
+	tdm-slots = <2>;
+	/* 4 serializers */
+	serial-dir = <	/* 0: INACTIVE, 1: TX, 2: RX */
+		0 1 0 0
+	>;
+	tx-num-evt = <32>;
+	//rx-num-evt = <32>;
+};
+
+&mcasp8 {
+	#sound-dai-cells = <0>;
+	assigned-clocks = <&abe_dpll_sys_clk_mux>;
+	assigned-clock-parents = <&sys_clkin2>;
+	pinctrl-names = "default"; 
+	pinctrl-0 = <&mcasp8_pins_default>; 
+	status = "okay";
+
+	op-mode = <0>;	/* MCASP_IIS_MODE */
+	tdm-slots = <2>;
+	/* 4 serializers */
+	serial-dir = <	/* 0: INACTIVE, 1: TX, 2: RX */
+		2 0 0 0
+	>;
+	//tx-num-evt = <32>;
+	rx-num-evt = <32>;
+};
+
+/* Sata  nodes  */
+&sata {
+	pinctrl-names = "default";
+	pinctrl-0 = <&sata_pins_default>;
+	status = "okay";
+};

@@ -1,0 +1,850 @@
+/*
+ * Copyright (C) 2014 Texas Instruments Incorporated - http://www.ti.com/
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2 as
+ * published by the Free Software Foundation.
+ */
+/dts-v1/;
+
+#include "dra74x.dtsi"
+#include <dt-bindings/gpio/gpio.h>
+#include <dt-bindings/interrupt-controller/irq.h>
+
+/ {
+	model = "TI AM5728 BeagleBoard-X15";
+	compatible = "ti,am572x-beagle-x15", "ti,am5728", "ti,dra742", "ti,dra74", "ti,dra7";
+
+	aliases {
+		rtc0 = &tps659038_rtc;
+		rtc1 = &rtc;
+
+		display0 = &lcd;
+		sound0 = &sound0;
+	};
+
+	tlv_osc: tlv_osc {
+		#clock-cells = <0>;
+		compatible = "fixed-clock";
+		clock-frequency = <24576000>;
+	};
+
+ 	lcd: display {
+
+                compatible = "omapdss,panel-dpi";
+
+                label = "lcd";
+
+                panel-timing {
+
+                        clock-frequency = <27000000>; 
+                        hactive = <720>;
+                        vactive = <576>;
+			
+			/* When in BT mode and interlaced, this field corresponds */
+			/* to the vertical field blanking No 1 for Even Field.	  */
+                        hfront-porch = <4>;
+			/* When in BT mode and interlaced, this field corresponds */
+			/* to the vertical field blanking No 2 for Even Field.;   */
+                        hback-porch = <20>;
+
+                        hsync-len = <256>;
+
+                        vfront-porch = <4>;
+                        vback-porch = <21>;
+
+                        vsync-len = <10>;
+
+                        pixelclk-active = <0>;
+			
+			interlaced = "true";
+                };
+
+                 port {
+                        lcd_in: endpoint {
+                                remote-endpoint = <&dpi_out>;
+                        };
+                };
+
+        };
+
+	memory {
+		device_type = "memory";
+		reg = <0x0 0x80000000 0x0 0x80000000>;
+	};
+
+	reserved-memory {
+		#address-cells = <2>;
+		#size-cells = <2>;
+		ranges;
+
+		ipu2_cma_pool: ipu2_cma@95800000 {
+			compatible = "shared-dma-pool";
+			reg = <0x0 0x95800000 0x0 0x3800000>;
+			reusable;
+			status = "okay";
+		};
+
+		dsp1_cma_pool: dsp1_cma@99000000 {
+			compatible = "shared-dma-pool";
+			reg = <0x0 0x99000000 0x0 0x4000000>;
+			reusable;
+			status = "okay";
+		};
+
+		ipu1_cma_pool: ipu1_cma@9d000000 {
+			compatible = "shared-dma-pool";
+			reg = <0x0 0x9d000000 0x0 0x2000000>;
+			reusable;
+			status = "okay";
+		};
+
+		dsp2_cma_pool: dsp2_cma@9f000000 {
+			compatible = "shared-dma-pool";
+			reg = <0x0 0x9f000000 0x0 0x800000>;
+			reusable;
+			status = "okay";
+		};
+	};
+
+	vdd_3v3: fixedregulator-vdd_3v3 {
+		compatible = "regulator-fixed";
+		regulator-name = "vdd_3v3";
+		vin-supply = <&regen1>;
+		regulator-min-microvolt = <3300000>;
+		regulator-max-microvolt = <3300000>;
+	};
+
+	aic_dvdd: fixedregulator-aic_dvdd {
+		compatible = "regulator-fixed";
+		regulator-name = "aic_dvdd_fixed";
+		vin-supply = <&vdd_3v3>;
+		regulator-min-microvolt = <1800000>;
+		regulator-max-microvolt = <1800000>;
+	};
+
+	vtt_fixed: fixedregulator-vtt {
+		/* TPS51200 */
+		compatible = "regulator-fixed";
+		regulator-name = "vtt_fixed";
+		vin-supply = <&smps3_reg>;
+		regulator-min-microvolt = <3300000>;
+		regulator-max-microvolt = <3300000>;
+		regulator-always-on;
+		regulator-boot-on;
+		enable-active-high;
+		gpio = <&gpio7 11 GPIO_ACTIVE_HIGH>;
+	};
+
+	gpio_fan: gpio_fan {
+		/* Based on 5v 500mA AFB02505HHB */
+		compatible = "gpio-fan";
+		gpios =  <&tps659038_gpio 2 GPIO_ACTIVE_HIGH>;
+		gpio-fan,speed-map = <0     0>,
+				     <13000 1>;
+		#cooling-cells = <2>;
+	};
+
+	sound0: sound@0 {
+		compatible = "simple-audio-card";
+		simple-audio-card,name = "BeagleBoard-X15";
+		simple-audio-card,widgets =
+/*			"Line", "Line Out",*/
+			"Line", "Line In";
+		simple-audio-card,routing =
+/*			"Line Out",	"HPL",*/
+/*			"Line Out",	"HPR",*/
+			"IN1_L",	"Line In",
+			"IN1_R",	"Line In";
+		simple-audio-card,format = "i2s";
+		simple-audio-card,bitclock-master = <&sound0_codec>;
+		simple-audio-card,frame-master = <&sound0_codec>;
+
+		sound0_cpu: simple-audio-card,cpu {
+			sound-dai = <&mcasp4>;
+			system-clock-direction = "out";
+		};
+
+		sound0_codec: simple-audio-card,codec {
+			sound-dai = <&tlv320aic32x4>;
+		};
+	};
+};
+
+&i2c1 {
+	status = "okay";
+	clock-frequency = <400000>;
+
+	tps659038: tps659038@58 {
+		compatible = "ti,tps659038";
+		reg = <0x58>;
+		interrupt-parent = <&gpio1>;
+		interrupts = <0 IRQ_TYPE_LEVEL_LOW>;
+
+		#interrupt-cells = <2>;
+		interrupt-controller;
+
+		ti,system-power-controller;
+		ti,palmas-override-powerhold;
+
+		tps659038_pmic {
+			compatible = "ti,tps659038-pmic";
+
+			regulators {
+				smps12_reg: smps12 {
+					/* VDD_MPU */
+					regulator-name = "smps12";
+					regulator-min-microvolt = < 850000>;
+					regulator-max-microvolt = <1250000>;
+					regulator-always-on;
+					regulator-boot-on;
+				};
+
+				smps3_reg: smps3 {
+					/* VDD_DDR */
+					regulator-name = "smps3";
+					regulator-min-microvolt = <1350000>;
+					regulator-max-microvolt = <1350000>;
+					regulator-always-on;
+					regulator-boot-on;
+				};
+
+				smps45_reg: smps45 {
+					/* VDD_DSPEVE, VDD_IVA, VDD_GPU */
+					regulator-name = "smps45";
+					regulator-min-microvolt = < 850000>;
+					regulator-max-microvolt = <1250000>;
+					regulator-always-on;
+					regulator-boot-on;
+				};
+
+				smps6_reg: smps6 {
+					/* VDD_CORE */
+					regulator-name = "smps6";
+					regulator-min-microvolt = <850000>;
+					regulator-max-microvolt = <1150000>;
+					regulator-always-on;
+					regulator-boot-on;
+				};
+
+				/* SMPS7 unused */
+
+				smps8_reg: smps8 {
+					/* VDD_1V8 */
+					regulator-name = "smps8";
+					regulator-min-microvolt = <1800000>;
+					regulator-max-microvolt = <1800000>;
+					regulator-always-on;
+					regulator-boot-on;
+				};
+
+				/* SMPS9 unused */
+
+				ldo1_reg: ldo1 {
+					/* VDD_SD / VDDSHV8  */
+					regulator-name = "ldo1";
+					regulator-min-microvolt = <1800000>;
+					regulator-max-microvolt = <3300000>;
+					regulator-boot-on;
+					regulator-always-on;
+				};
+
+				ldo2_reg: ldo2 {
+					/* VDD_SHV5 */
+					regulator-name = "ldo2";
+					regulator-min-microvolt = <3300000>;
+					regulator-max-microvolt = <3300000>;
+					regulator-always-on;
+					regulator-boot-on;
+				};
+
+				ldo3_reg: ldo3 {
+					/* VDDA_1V8_PHYA */
+					regulator-name = "ldo3";
+					regulator-min-microvolt = <1800000>;
+					regulator-max-microvolt = <1800000>;
+					regulator-always-on;
+					regulator-boot-on;
+				};
+
+				ldo4_reg: ldo4 {
+					/* VDDA_1V8_PHYB */
+					regulator-name = "ldo4";
+					regulator-min-microvolt = <1800000>;
+					regulator-max-microvolt = <1800000>;
+					regulator-always-on;
+					regulator-boot-on;
+				};
+
+				ldo9_reg: ldo9 {
+					/* VDD_RTC */
+					regulator-name = "ldo9";
+					regulator-min-microvolt = <1050000>;
+					regulator-max-microvolt = <1050000>;
+					regulator-always-on;
+					regulator-boot-on;
+				};
+
+				ldoln_reg: ldoln {
+					/* VDDA_1V8_PLL */
+					regulator-name = "ldoln";
+					regulator-min-microvolt = <1800000>;
+					regulator-max-microvolt = <1800000>;
+					regulator-always-on;
+					regulator-boot-on;
+				};
+
+				ldousb_reg: ldousb {
+					/* VDDA_3V_USB: VDDA_USBHS33 */
+					regulator-name = "ldousb";
+					regulator-min-microvolt = <3300000>;
+					regulator-max-microvolt = <3300000>;
+					regulator-boot-on;
+				};
+
+				regen1: regen1 {
+					/* VDD_3V3_ON */
+					regulator-name = "regen1";
+					regulator-boot-on;
+					regulator-always-on;
+				};
+			};
+		};
+
+		tps659038_rtc: tps659038_rtc {
+			compatible = "ti,palmas-rtc";
+			interrupt-parent = <&tps659038>;
+			interrupts = <8 IRQ_TYPE_EDGE_FALLING>;
+			wakeup-source;
+		};
+
+		tps659038_pwr_button: tps659038_pwr_button {
+			compatible = "ti,palmas-pwrbutton";
+			interrupt-parent = <&tps659038>;
+			interrupts = <1 IRQ_TYPE_EDGE_FALLING>;
+			wakeup-source;
+			ti,palmas-long-press-seconds = <12>;
+		};
+
+		tps659038_gpio: tps659038_gpio {
+			compatible = "ti,palmas-gpio";
+			gpio-controller;
+			#gpio-cells = <2>;
+		};
+
+		extcon_usb2: tps659038_usb {
+			compatible = "ti,palmas-usb-vid";
+			ti,enable-vbus-detection;
+			vbus-gpio = <&gpio4 21 GPIO_ACTIVE_HIGH>;
+		};
+
+	};
+
+	tmp102: tmp102@48 {
+		compatible = "ti,tmp102";
+		reg = <0x48>;
+		interrupt-parent = <&gpio7>;
+		interrupts = <16 IRQ_TYPE_LEVEL_LOW>;
+		#thermal-sensor-cells = <1>;
+	};
+};
+
+&dra7_pmx_core {
+    i2c4_pins_default: i2c4_pins_default {
+		pinctrl-single,pins = <
+            0x370 (PIN_INPUT_PULLUP | MUX_MODE4) /* mmc1_sdwp SCL*/
+            0x36c (PIN_INPUT_PULLUP | MUX_MODE4) /* mmc1_sdcd SDA*/
+            0x2ac (MUX_MODE15) /* B14*/
+            0x2b0 (MUX_MODE15) /* J14*/
+		>;
+	};
+
+	mmc2_pins_default: mmc2_pins_default {
+		pinctrl-single,pins = <
+			DRA7XX_CORE_IOPAD(0x349c, (PIN_INPUT_PULLUP | MUX_MODE1)) /* gpmc_a23.mmc2_clk */
+			DRA7XX_CORE_IOPAD(0x34b0, (PIN_INPUT_PULLUP | MUX_MODE1)) /* gpmc_cs1.mmc2_cmd */
+			DRA7XX_CORE_IOPAD(0x34a0, (PIN_INPUT_PULLUP | MUX_MODE1)) /* gpmc_a24.mmc2_dat0 */
+			DRA7XX_CORE_IOPAD(0x34a4, (PIN_INPUT_PULLUP | MUX_MODE1)) /* gpmc_a25.mmc2_dat1 */
+			DRA7XX_CORE_IOPAD(0x34a8, (PIN_INPUT_PULLUP | MUX_MODE1)) /* gpmc_a26.mmc2_dat2 */
+			DRA7XX_CORE_IOPAD(0x34ac, (PIN_INPUT_PULLUP | MUX_MODE1)) /* gpmc_a27.mmc2_dat3 */
+			DRA7XX_CORE_IOPAD(0x348c, (PIN_INPUT_PULLUP | MUX_MODE1)) /* gpmc_a19.mmc2_dat4 */
+			DRA7XX_CORE_IOPAD(0x3490, (PIN_INPUT_PULLUP | MUX_MODE1)) /* gpmc_a20.mmc2_dat5 */
+			DRA7XX_CORE_IOPAD(0x3494, (PIN_INPUT_PULLUP | MUX_MODE1)) /* gpmc_a21.mmc2_dat6 */
+			DRA7XX_CORE_IOPAD(0x3498, (PIN_INPUT_PULLUP | MUX_MODE1)) /* gpmc_a22.mmc2_dat7 */
+		>;
+	};
+};
+
+&mmc2 {
+	pinctrl-names = "default";
+	pinctrl-0 = <&mmc2_pins_default>;
+};
+
+&i2c2 {
+    	status = "okay";
+	clock-frequency = <100000>;
+	pinctrl-names = "default";
+	pinctrl-0 = <&i2c2_pins_default>;
+
+	tlv320aic32x4: tlv320aic32x4@1a {
+		#sound-dai-cells = <0>;
+		compatible = "ti,tlv320aic32x4";
+		reg = <0x1a>;
+		//clocks = <&sys_clkin2>;
+		clocks = <&tlv_osc>;
+		clock-names = "mclk";		
+		av-supply = <&vdd_3v3>;
+		iov-supply = <&vdd_3v3>;
+		dv-supply = <&aic_dvdd>;
+
+		assigned-clocks = <&clkoutmux2_clk_mux>, <&timer7_gfclk_mux>, <&clkoutmux0_clk_mux>;
+		assigned-clock-parents = <&sys_clk2_dclk_div>, <&clkoutmux0_clk_mux>, <&sys_clk1_dclk_div>;
+
+		status = "okay";
+	};
+};
+
+&i2c4 {
+    status = "okay";
+    clock-frequency = <400000>;
+    pinctrl-names = "default";
+    pinctrl-0 = <&i2c4_pins_default>;
+
+
+    videoout: adv7393@2a {
+        compatible = "adi,adv7393";
+        reg = <0x2a>;	
+    };
+
+    videoin: adv7180@20 {
+        compatible = "adi,adv7180";
+        reg = <0x20>;
+	remote = <&vin3a>;
+	
+	port {
+		video_input: endpoint {
+			remote-endpoint = <&vin3aep>;
+			pclk-sample = <0>;
+			data-active = <0>;
+			channels = <0>;
+		};
+	};
+
+    };
+	// Configuration for the two-channel device variants PCM1863/PCM1862
+	pcm1863: pcm1863@4a {
+		#sound-dai-cells = <0>;
+
+		status = "okay";
+
+		compatible = "ti,pcm1863";
+		reg = <0x4a>;
+
+		//    pllclk = <98304000>;
+		//    pllclk = <90316800>;
+
+		//pinctrl-names = "default";
+		//pinctrl-0 = <&pcm186x_int_pin>;
+		interrupts-extended = <&gpio1 28 IRQ_TYPE_EDGE_FALLING>;
+	};
+};
+
+/* Set vip remote endpoint in the vin3a to adv7180 output  */
+
+&vip2 {
+
+	pinctrl-names = "default"; 
+	pinctrl-0 = <&vin3a_pins_default>;
+
+	status = "okay";
+};
+
+&vin3a {
+	status = "okay";
+
+	hsync-active = <0>;
+	vsync-active = <1>;
+		vin3aep: endpoint {
+			slave-mode;
+			bus_width = <8>;
+			hsync-active = <0>;
+			vsync-active = <1>;
+			remote-endpoint = <&video_input>;
+		};
+};
+
+&gpio7 {
+	ti,no-reset-on-init;
+	ti,no-idle-on-init;
+};
+
+&uart3 {
+	status = "okay";
+	interrupts-extended = <&crossbar_mpu GIC_SPI 69 IRQ_TYPE_LEVEL_HIGH>,
+			      <&dra7_pmx_core 0x3f8>;
+};
+
+&mac {
+	status = "okay";
+	dual_emac;
+};
+
+&cpsw_emac0 {
+	phy_id = <&davinci_mdio>, <1>;
+	phy-mode = "rgmii";
+	dual_emac_res_vlan = <1>;
+};
+
+&cpsw_emac1 {
+	phy_id = <&davinci_mdio>, <2>;
+	phy-mode = "rgmii";
+	dual_emac_res_vlan = <2>;
+};
+
+&mmc2 {
+	status = "okay";
+
+	vmmc-supply = <&vdd_3v3>;
+	bus-width = <8>;
+	ti,non-removable;
+	cap-mmc-dual-data-rate;
+};
+
+&sata {
+	status = "okay";
+};
+
+&usb2_phy1 {
+	phy-supply = <&ldousb_reg>;
+};
+
+&usb2_phy2 {
+	phy-supply = <&ldousb_reg>;
+};
+
+&usb1 {
+	dr_mode = "host";
+};
+
+&omap_dwc3_2 {
+	extcon = <&extcon_usb2>;
+};
+
+&usb2 {
+	/*
+	 * Stand alone usage is peripheral only.
+	 * However, with some resistor modifications
+	 * this port can be used via expansion connectors
+	 * as "host" or "dual-role". If so, provide
+	 * the necessary dr_mode override in the expansion
+	 * board's DT.
+	 */
+	dr_mode = "peripheral";
+};
+
+&cpu_trips {
+	cpu_alert1: cpu_alert1 {
+		temperature = <50000>; /* millicelsius */
+		hysteresis = <2000>; /* millicelsius */
+		type = "active";
+	};
+};
+
+&cpu_cooling_maps {
+	map1 {
+		trip = <&cpu_alert1>;
+		cooling-device = <&gpio_fan THERMAL_NO_LIMIT THERMAL_NO_LIMIT>;
+	};
+};
+
+&thermal_zones {
+	board_thermal: board_thermal {
+		polling-delay-passive = <1250>; /* milliseconds */
+		polling-delay = <1500>; /* milliseconds */
+
+				/* sensor       ID */
+		thermal-sensors = <&tmp102     0>;
+
+		board_trips: trips {
+			board_alert0: board_alert {
+				temperature = <40000>; /* millicelsius */
+				hysteresis = <2000>; /* millicelsius */
+				type = "active";
+			};
+
+			board_crit: board_crit {
+				temperature = <105000>; /* millicelsius */
+				hysteresis = <0>; /* millicelsius */
+				type = "critical";
+			};
+		};
+
+		board_cooling_maps: cooling-maps {
+			map0 {
+				trip = <&board_alert0>;
+				cooling-device =
+				  <&gpio_fan THERMAL_NO_LIMIT THERMAL_NO_LIMIT>;
+			};
+		};
+       };
+};
+
+&oppdm_mpu {
+	vdd-supply = <&smps12_reg>;
+};
+
+&oppdm_dspeve {
+	vdd-supply = <&smps45_reg>;
+};
+
+&oppdm_gpu {
+	vdd-supply = <&smps45_reg>;
+};
+
+&oppdm_ivahd {
+	vdd-supply = <&smps45_reg>;
+};
+
+&oppdm_core {
+	vdd-supply = <&smps6_reg>;
+};
+
+&bb2d {
+	status = "okay";
+};
+
+&mcasp3 {
+	#sound-dai-cells = <0>;
+	assigned-clocks = <&mcasp3_ahclkx_mux>;
+	assigned-clock-parents = <&sys_clkin2>;
+	status = "okay";
+
+	op-mode = <0>;	/* MCASP_IIS_MODE */
+	tdm-slots = <2>;
+	/* 4 serializers */
+	serial-dir = <	/* 0: INACTIVE, 1: TX, 2: RX */
+		1 2 0 0
+	>;
+	tx-num-evt = <32>;
+	rx-num-evt = <32>;
+};
+
+/* Set DSS  */
+&dss {
+	status = "okay";
+
+	pinctrl-names = "default"; 
+	pinctrl-0 = <&vout1_pins_default>; 
+
+	vdda_video-supply = <&ldoln_reg>;
+
+
+	port {
+		dpi_out: endpoint {
+			remote-endpoint = <&lcd_in>;
+			data-lines = <24>;
+		};
+	};
+};
+
+/* McASP nodes  */
+&mcasp4 {
+	#sound-dai-cells = <0>;
+	assigned-clocks = <&mcasp4_ahclkx_mux>;
+	assigned-clock-parents = <&sys_clkin2>;
+	pinctrl-names = "default"; 
+	pinctrl-0 = <&mcasp4_pins_default>; 
+	status = "okay";
+
+	op-mode = <0>;	/* MCASP_IIS_MODE */
+	tdm-slots = <2>;
+	/* 4 serializers */
+	serial-dir = <	/* 0: INACTIVE, 1: TX, 2: RX */
+		2 0 0 0
+	>;
+	/*tx-num-evt = <32>;*/
+	rx-num-evt = <32>;
+};
+
+&mcasp5 {
+	#sound-dai-cells = <0>;
+	assigned-clocks = <&mcasp5_ahclkx_mux>;
+	assigned-clock-parents = <&sys_clkin2>;
+	pinctrl-names = "default"; 
+	pinctrl-0 = <&mcasp5_pins_default>; 
+	status = "okay";
+
+	op-mode = <0>;	/* MCASP_IIS_MODE */
+	tdm-slots = <2>;
+	/* 4 serializers */
+	serial-dir = <	/* 0: INACTIVE, 1: TX, 2: RX */
+		0 2 0 0
+	>;
+	tx-num-evt = <32>;
+	rx-num-evt = <32>;
+};
+
+&mcasp6 {
+	#sound-dai-cells = <0>;
+	assigned-clocks = <&mcasp6_ahclkx_mux>;
+	assigned-clock-parents = <&sys_clkin2>;
+	pinctrl-names = "default"; 
+	pinctrl-0 = <&mcasp6_pins_default>; 
+	status = "okay";
+
+	op-mode = <0>;	/* MCASP_IIS_MODE */
+	tdm-slots = <2>;
+	/* 4 serializers */
+	serial-dir = <	/* 0: INACTIVE, 1: TX, 2: RX */
+		0 1 0 0
+	>;
+	tx-num-evt = <32>;
+	rx-num-evt = <32>;
+};
+
+&mcasp8 {
+	#sound-dai-cells = <0>;
+	assigned-clocks = <&mcasp8_ahclkx_mux>;
+	assigned-clock-parents = <&sys_clkin2>;
+	pinctrl-names = "default"; 
+	pinctrl-0 = <&mcasp8_pins_default>; 
+	status = "okay";
+
+	op-mode = <0>;	/* MCASP_IIS_MODE */
+	tdm-slots = <2>;
+	/* 4 serializers */
+	serial-dir = <	/* 0: INACTIVE, 1: TX, 2: RX */
+		2 0 0 0
+	>;
+	tx-num-evt = <32>;
+	rx-num-evt = <32>;
+};
+
+
+&mailbox3 {
+	status = "okay";
+	mbox_pru1_0: mbox_pru1_0 {
+		status = "okay";
+	};
+	mbox_pru1_1: mbox_pru1_1 {
+		status = "okay";
+	};
+};
+
+&mailbox4 {
+	status = "okay";
+	mbox_pru2_0: mbox_pru2_0 {
+		status = "okay";
+	};
+	mbox_pru2_1: mbox_pru2_1 {
+		status = "okay";
+	};
+};
+
+&mailbox5 {
+	status = "okay";
+	mbox_ipu1_ipc3x: mbox_ipu1_ipc3x {
+		status = "okay";
+	};
+	mbox_dsp1_ipc3x: mbox_dsp1_ipc3x {
+		status = "okay";
+	};
+};
+
+&mailbox6 {
+	status = "okay";
+	mbox_ipu2_ipc3x: mbox_ipu2_ipc3x {
+		status = "okay";
+	};
+	mbox_dsp2_ipc3x: mbox_dsp2_ipc3x {
+		status = "okay";
+	};
+};
+
+&mmu0_dsp1 {
+	status = "okay";
+};
+
+&mmu1_dsp1 {
+	status = "okay";
+};
+
+&mmu0_dsp2 {
+	status = "okay";
+};
+
+&mmu1_dsp2 {
+	status = "okay";
+};
+
+&mmu_ipu1 {
+	status = "okay";
+};
+
+&mmu_ipu2 {
+	status = "okay";
+};
+
+&ipu2 {
+	status = "okay";
+	memory-region = <&ipu2_cma_pool>;
+	mboxes = <&mailbox6 &mbox_ipu2_ipc3x>;
+	timers = <&timer3>;
+	watchdog-timers = <&timer4>, <&timer9>;
+};
+
+&ipu1 {
+	status = "okay";
+	memory-region = <&ipu1_cma_pool>;
+	mboxes = <&mailbox5 &mbox_ipu1_ipc3x>;
+	timers = <&timer11>;
+};
+
+&dsp1 {
+	status = "okay";
+	memory-region = <&dsp1_cma_pool>;
+	mboxes = <&mailbox5 &mbox_dsp1_ipc3x>;
+	timers = <&timer5>;
+};
+
+&dsp2 {
+	status = "okay";
+	memory-region = <&dsp2_cma_pool>;
+	mboxes = <&mailbox6 &mbox_dsp2_ipc3x>;
+	timers = <&timer6>;
+};
+
+&pruss1 {
+	status = "okay";
+	pru1_0: pru0@4b234000 {
+		interrupt-parent = <&pruss1_intc>;
+		interrupts = <16>, <17>;
+		interrupt-names = "vring", "kick";
+		status = "okay";
+	};
+
+	pru1_1: pru1@4b238000 {
+		interrupt-parent = <&pruss1_intc>;
+		interrupts = <18>, <19>;
+		interrupt-names = "vring", "kick";
+		status = "okay";
+	};
+};
+
+&pruss2 {
+	status = "okay";
+	pru2_0: pru0@4b2b4000 {
+		interrupt-parent = <&pruss2_intc>;
+		interrupts = <16>, <17>;
+		interrupt-names = "vring", "kick";
+		status = "okay";
+	};
+
+	pru2_1: pru1@4b2b8000 {
+		interrupt-parent = <&pruss2_intc>;
+		interrupts = <18>, <19>;
+		interrupt-names = "vring", "kick";
+		status = "okay";
+	};
+};
+

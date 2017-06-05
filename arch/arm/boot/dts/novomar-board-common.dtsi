@@ -183,6 +183,24 @@
 	pinctrl-names = "default";
 	pinctrl-0 = <&i2c3_pins_default>;
 	status = "okay";
+
+	codec0: tlv320aic32x4@18 {
+		#sound-dai-cells = <0>;
+		compatible = "ti,tlv320aic32x4";
+		reg = <0x18>;
+		//clocks = <&sys_clkin2>;
+		clocks = <&tlv_osc>;
+		clock-names = "mclk";		
+		av-supply = <&vdd_3v3>;
+		iov-supply = <&vdd_3v3>;
+		dv-supply = <&aic_dvdd>;
+
+		assigned-clocks = <&clkoutmux2_clk_mux>, <&timer7_gfclk_mux>, <&clkoutmux0_clk_mux>;
+		assigned-clock-parents = <&sys_clk2_dclk_div>, <&clkoutmux0_clk_mux>, <&sys_clk1_dclk_div>;
+
+		status = "okay";
+	};
+
 };
 
 /* General purpose i2c bus */

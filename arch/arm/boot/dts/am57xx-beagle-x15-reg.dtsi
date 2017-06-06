@@ -21,12 +21,6 @@
 		display0 = &lcd;
 	};
 
-	tlv_osc: tlv_osc {
-		#clock-cells = <0>;
-		compatible = "fixed-clock";
-		clock-frequency = <24576000>;
-	};
-
  	lcd: display {
 
                 compatible = "omapdss,panel-dpi";
@@ -372,83 +366,44 @@
 	};
 };
 
+/* eMMC */
 &mmc2 {
 	pinctrl-names = "default";
 	pinctrl-0 = <&mmc2_pins_default>;
 };
 
-&i2c2 {
-    	status = "okay";
-	clock-frequency = <100000>;
-	pinctrl-names = "default";
-	pinctrl-0 = <&i2c2_pins_default>;
-
-	/*codec0: tlv320aic32x4@18 {
-		#sound-dai-cells = <0>;
-		compatible = "ti,tlv320aic32x4";
-		reg = <0x18>;
-		//clocks = <&sys_clkin2>;
-		clocks = <&tlv_osc>;
-		clock-names = "mclk";		
-		av-supply = <&vdd_3v3>;
-		iov-supply = <&vdd_3v3>;
-		dv-supply = <&aic_dvdd>;
-
-		assigned-clocks = <&clkoutmux2_clk_mux>, <&timer7_gfclk_mux>, <&clkoutmux0_clk_mux>;
-		assigned-clock-parents = <&sys_clk2_dclk_div>, <&clkoutmux0_clk_mux>, <&sys_clk1_dclk_div>;
-
-		status = "okay";
-	};*/
-
-	codec1: tlv320aic32x4@1a {
-		#sound-dai-cells = <0>;
-		compatible = "ti,tlv320aic32x4";
-		reg = <0x1a>;
-		//clocks = <&sys_clkin2>;
-		clocks = <&tlv_osc>;
-		clock-names = "mclk";		
-		av-supply = <&vdd_3v3>;
-		iov-supply = <&vdd_3v3>;
-		dv-supply = <&aic_dvdd>;
-
-		assigned-clocks = <&clkoutmux2_clk_mux>, <&timer7_gfclk_mux>, <&clkoutmux0_clk_mux>;
-		assigned-clock-parents = <&sys_clk2_dclk_div>, <&clkoutmux0_clk_mux>, <&sys_clk1_dclk_div>;
-
-		status = "okay";
-	};
-};
-
+/* I2C4 bus */
 &i2c4 {
     status = "okay";
     clock-frequency = <400000>;
     pinctrl-names = "default";
     pinctrl-0 = <&i2c4_pins_default>;
 
-
+    /* Analog Device output video decoder */
     videoout: adv7393@2a {
         compatible = "adi,adv7393";
         reg = <0x2a>;	
     };
 
+    /* Analog device input video encoder */
     videoin: adv7180@20 {
         compatible = "adi,adv7180";
         reg = <0x20>;
-	remote = <&vin3a>;
+		remote = <&vin3a>;
 	
-	port {
-		video_input: endpoint {
-			remote-endpoint = <&vin3aep>;
-			pclk-sample = <0>;
-			data-active = <0>;
-			channels = <0>;
+		port {
+			video_input: endpoint {
+				remote-endpoint = <&vin3aep>;
+				pclk-sample = <0>;
+				data-lines-active = <0>;
+				channels = <0>;
+			};
 		};
-	};
-
     };
+
 };
 
 /* Set vip remote endpoint in the vin3a to adv7180 output  */
-
 &vip2 {
 
 	pinctrl-names = "default"; 

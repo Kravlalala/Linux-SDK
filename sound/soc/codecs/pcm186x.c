@@ -416,9 +416,9 @@ static const struct snd_soc_dapm_widget pcm1863_dapm_widgets[] = {
 	SND_SOC_DAPM_INPUT("VINR4"),
 
 	SND_SOC_DAPM_MUX("ADC Left Capture Source", SND_SOC_NOPM, 0, 0,
-			 &pcm186x_adc_mux_controls[0]),
+			 &pcm186x_adc_mux_controls[2]),
 	SND_SOC_DAPM_MUX("ADC Right Capture Source", SND_SOC_NOPM, 0, 0,
-			 &pcm186x_adc_mux_controls[1]),
+			 &pcm186x_adc_mux_controls[3]),
 
 	/*
 	 * Put the codec into SLEEP mode when not in use, allowing the
@@ -1180,6 +1180,19 @@ int pcm186x_probe(struct device *dev, enum pcm186x_type type, int irq,
 	if (ret != 0) {
 		dev_err(dev, "failed to register CODEC: %d\n", ret);
 		goto err_free_irq;
+	}
+
+	//Change input to VIN2L
+	ret = regmap_write(regmap, PCM186X_ADC1_INPUT_SEL_L, 0x02);
+	if (ret) {
+		dev_err(dev, "Error writing device: %d\n", ret);
+		return ret;
+	}
+	//Change input to VIN2R
+	ret = regmap_write(regmap, PCM186X_ADC1_INPUT_SEL_R, 0x02);
+	if (ret) {
+		dev_err(dev, "Error writing device: %d\n", ret);
+		return ret;
 	}
 
 	dev_dbg(dev, "registered codec type: %d\n", priv->type);

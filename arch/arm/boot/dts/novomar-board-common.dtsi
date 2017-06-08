@@ -10,6 +10,8 @@
 	compatible = "ti,am5728-evm", "ti,am572x-beagle-x15", "ti,am5728", "ti,dra742", "ti,dra74", "ti,dra7";	
 
 	/* Novomar bindings */
+
+	/* GPIO leds */
 	leds {
 		compatible = "gpio-leds";
 		led@0 {
@@ -41,39 +43,62 @@
 		};
 	};
 
+	/* External oscillator on microphone board */
+	tlv_osc: tlv_osc {
+		#clock-cells = <0>;
+		compatible = "fixed-clock";
+		clock-frequency = <24576000>;
+	};
+
 	/* PCM5102a codec */
 	pcm5102a: pcm5102a {
 		#sound-dai-cells = <0>;
 		compatible = "ti,pcm5102a";
 	};
 
-	/* Left microphone */
-	left_mic: sound@0 {
+	/* Line-in */
+	sound0: sound@0 {
 		compatible = "simple-audio-card";
-		simple-audio-card,name = "LMicrophone";
+		simple-audio-card,name = "PCM1862";
 		simple-audio-card,widgets =
-			"Line", "Line In";
+			"Line", "Line In Jack 1",
+			"Line", "Line In Jack 2",
+			"Line", "Line In Jack 3",
+			"Line", "Line In Jack 4";
 		simple-audio-card,routing =
-			"IN1_L",	"Line In",
-			"IN1_R",	"Line In";
+			"Line In Jack 1", "VINL1",
+			"Line In Jack 1", "VINR1",
+			"Line In Jack 2", "VINL2",
+			"Line In Jack 2", "VINR2",
+			"Line In Jack 3", "VINL3",
+			"Line In Jack 3", "VINR3",
+			"Line In Jack 4", "VINL4",
+			"Line In Jack 4", "VINR4";
 		simple-audio-card,format = "i2s";
 		simple-audio-card,bitclock-master = <&sound0_codec>;
 		simple-audio-card,frame-master = <&sound0_codec>;
 
 		sound0_cpu: simple-audio-card,cpu {
-			sound-dai = <&mcasp8>;
-			system-clock-direction = "out";
+			sound-dai = <&mcasp5>;
+	    		system-clock-direction = "out";
 		};
 
 		sound0_codec: simple-audio-card,codec {
-			sound-dai = <&codec0>;
+			sound-dai = <&pcm1862>;
+			
+			//Need this here otherwise recording won't work probably because
+			//some davinci-mcasp.c setup function doesn't get called. For now
+			//lets plug in the frequency of the XTAL attached to the PCM1863.
+			//This value will get passed to our codec's pcm186x_set_sysclk()
+			//function.
+			system-clock-frequency = <24576000>;
 		};
 	};
 
-	/* Right microphone */
-	right_mic: sound@1 {
+	/* Left microphone */
+	left_mic: sound@1 {
 		compatible = "simple-audio-card";
-		simple-audio-card,name = "RMicrophone";
+		simple-audio-card,name = "LMicrophone";
 		simple-audio-card,widgets =
 			"Line", "Line In";
 		simple-audio-card,routing =
@@ -89,12 +114,35 @@
 		};
 
 		sound1_codec: simple-audio-card,codec {
+			sound-dai = <&codec0>;
+		};
+	};
+
+	/* Right microphone */
+	right_mic: sound@2 {
+		compatible = "simple-audio-card";
+		simple-audio-card,name = "RMicrophone";
+		simple-audio-card,widgets =
+			"Line", "Line In";
+		simple-audio-card,routing =
+			"IN1_L",	"Line In",
+			"IN1_R",	"Line In";
+		simple-audio-card,format = "i2s";
+		simple-audio-card,bitclock-master = <&sound2_codec>;
+		simple-audio-card,frame-master = <&sound2_codec>;
+
+		sound2_cpu: simple-audio-card,cpu {
+			sound-dai = <&mcasp8>;
+			system-clock-direction = "out";
+		};
+
+		sound2_codec: simple-audio-card,codec {
 			sound-dai = <&codec1>;
 		};
 	};
 
 	/* Audio output */
-	playback_card:sound@2 {
+	playback_card:sound@3 {
 	  compatible = "simple-audio-card";
 	  simple-audio-card,name = "PCM5102a";
 	  simple-audio-card,format = "i2s";
@@ -112,7 +160,6 @@
 	  };
 	  
 	};
-
 };
 
 /* UART nodes */
@@ -178,17 +225,43 @@
 	};
 };
 
+/* I2C2 bus */
+&i2c2 {
+    	status = "okay";
+	clock-frequency = <100000>;
+	pinctrl-names = "default";
+	pinctrl-0 = <&i2c2_pins_default>;
+
+	/* Microphone codec tlv320adc3101. Second channel */
+	codec0: l_tlv320adc3101@18 {
+		#sound-dai-cells = <0>;
+		compatible = "ti,tlv320aic32x4";
+		reg = <0x18>;
+		clocks = <&tlv_osc>;
+		clock-names = "mclk";		
+		av-supply = <&vdd_3v3>;
+		iov-supply = <&vdd_3v3>;
+		dv-supply = <&aic_dvdd>;
+
+		assigned-clocks = <&clkoutmux2_clk_mux>, <&timer7_gfclk_mux>, <&clkoutmux0_clk_mux>;
+		assigned-clock-parents = <&sys_clk2_dclk_div>, <&clkoutmux0_clk_mux>, <&sys_clk1_dclk_div>;
+
+		status = "okay";
+	};
+};
+
+/* I2C3 bus */
 &i2c3 {
 	clock-frequency = <400000>;
 	pinctrl-names = "default";
 	pinctrl-0 = <&i2c3_pins_default>;
 	status = "okay";
 
-	codec0: tlv320aic32x4@18 {
+	/* Microphone codecs tlv320adc3101. First channel */
+	codec1: r_tlv320adc3101@18 {
 		#sound-dai-cells = <0>;
 		compatible = "ti,tlv320aic32x4";
 		reg = <0x18>;
-		//clocks = <&sys_clkin2>;
 		clocks = <&tlv_osc>;
 		clock-names = "mclk";		
 		av-supply = <&vdd_3v3>;
@@ -203,6 +276,18 @@
 
 };
 
+/* I2C4 bus */
+&i2c4 {
+	/* Line-in codec pcm1862 */
+	pcm1862: pcm1862@4a {
+		#sound-dai-cells = <0>;
+		status = "okay";
+		compatible = "ti,pcm1863";
+		reg = <0x4a>;
+		interrupts-extended = <&gpio1 28 IRQ_TYPE_EDGE_FALLING>;
+	};
+};
+
 /* General purpose i2c bus */
 &i2c5 {
 	clock-frequency = <400000>;
@@ -212,6 +297,7 @@
 };
 
 /* McASP nodes  */
+/* Audio input from line-in*/
 &mcasp5 {
 	#sound-dai-cells = <0>;
 	assigned-clocks = <&mcasp5_ahclkx_mux>;
@@ -226,10 +312,11 @@
 	serial-dir = <	/* 0: INACTIVE, 1: TX, 2: RX */
 		0 2 0 0
 	>;
-	tx-num-evt = <32>;
+	//tx-num-evt = <32>;
 	rx-num-evt = <32>;
 };
 
+/* Audio output to the PCM5102a */
 &mcasp6 {
 	#sound-dai-cells = <0>;
 	assigned-clocks = <&abe_dpll_sys_clk_mux>;
@@ -248,6 +335,7 @@
 	//rx-num-evt = <32>;
 };
 
+/* Audio input from Port A*/
 &mcasp8 {
 	#sound-dai-cells = <0>;
 	assigned-clocks = <&abe_dpll_sys_clk_mux>;

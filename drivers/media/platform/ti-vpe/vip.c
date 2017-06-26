@@ -1354,6 +1354,8 @@ static int vip_s_std(struct file *file, void *fh, v4l2_std_id std)
 	struct vip_port *port = stream->port;
 	struct vip_dev *dev = port->dev;
 
+	//printk("!!! kb-oberon !!! %s:%s:%d: std=%llx\n", __FILE__, __FUNCTION__, __LINE__, std);
+
 	vip_dbg(1, dev, "s_std: 0x%lx\n", (unsigned long)std);
 
 	if (!(std & stream->vfd->tvnorms)) {
@@ -1492,7 +1494,9 @@ static int vip_calc_format_size(struct vip_port *port,
 
 	if (*field == V4L2_FIELD_ANY)
 		*field = V4L2_FIELD_NONE;
-	else if (V4L2_FIELD_NONE != *field && V4L2_FIELD_ALTERNATE != *field)
+	else if (  V4L2_FIELD_NONE 	 != *field 
+		&& V4L2_FIELD_ALTERNATE  != *field
+		&& V4L2_FIELD_INTERLACED != *field) /* kb-oberon */
 		return -EINVAL;
 
 	v4l_bound_align_image(&f->fmt.pix.width, MIN_W, MAX_W, W_ALIGN,
@@ -1508,7 +1512,8 @@ static int vip_calc_format_size(struct vip_port *port,
 		 (fmt->coplanar ? fmt->vpdma_fmt[1]->depth : 0)) >> 3;
 
 	// kb-oberon
-	if (*field == V4L2_FIELD_ALTERNATE)
+	if (   *field == V4L2_FIELD_ALTERNATE
+	    || *field == V4L2_FIELD_INTERLACED ) /* kb-oberon */
 		f->fmt.pix.sizeimage /= 2;		
 	
 	f->fmt.pix.colorspace = fmt->colorspace;
@@ -1540,7 +1545,7 @@ static int vip_try_fmt_vid_cap(struct file *file, void *priv,
 	enum vip_csc_state csc_direction;
 
 	// kb-oberon
-	f->fmt.pix.field = V4L2_FIELD_ALTERNATE;
+	f->fmt.pix.field = V4L2_FIELD_INTERLACED; // ALTERNATE;
 
 	vip_dbg(3, dev, "try_fmt fourcc:%s size: %dx%d\n",
 		fourcc_to_str(f->fmt.pix.pixelformat),
@@ -1786,7 +1791,7 @@ static int vip_s_fmt_vid_cap(struct file *file, void *priv,
 		return -EBUSY;
 	}
 	// kb-oberon
-	f->fmt.pix.field = V4L2_FIELD_ALTERNATE;
+	f->fmt.pix.field = V4L2_FIELD_INTERLACED; // ALTERNATE;
 
 	/*
 	 * Check if we need the scaler or not
@@ -1833,7 +1838,8 @@ static int vip_s_fmt_vid_cap(struct file *file, void *priv,
 	else
 		allocate_csc(port, csc_direction);
 
-	if (stream->sup_field == V4L2_FIELD_ALTERNATE)
+	if (	stream->sup_field == V4L2_FIELD_ALTERNATE
+	     || stream->sup_field == V4L2_FIELD_INTERLACED ) /* kb-oberon */
 		port->flags |= FLAG_INTERLACED;
 	else
 		port->flags &= ~FLAG_INTERLACED;
@@ -2735,7 +2741,8 @@ static int vip_init_port(struct vip_port *port)
 		fourcc_to_str(fmt->fourcc),
 		mbus_fmt->width, mbus_fmt->height);
 
-	if (mbus_fmt->field == V4L2_FIELD_ALTERNATE)
+	if (	mbus_fmt->field == V4L2_FIELD_ALTERNATE
+	    || 	mbus_fmt->field == V4L2_FIELD_INTERLACED  ) /* kb-oberon */
 		port->flags |= FLAG_INTERLACED;
 	else
 		port->flags &= ~FLAG_INTERLACED;
@@ -2793,7 +2800,7 @@ static int vip_init_stream(struct vip_stream *stream)
 	f.fmt.pix.pixelformat = fmt->fourcc;
 
 	/* kb-oberon */
-	f.fmt.pix.field = V4L2_FIELD_ALTERNATE;
+	f.fmt.pix.field = V4L2_FIELD_INTERLACED; // ALTERNATE;
 
 	ret = vip_calc_format_size(port, fmt, &f);
 	

@@ -28,8 +28,11 @@
 #include <linux/of.h>
 #include <media/v4l2-ioctl.h>
 #include <linux/videodev2.h>
+
 #include <media/v4l2-device.h>
 #include <media/v4l2-ctrls.h>
+#include <media/v4l2-event.h>
+
 #include <linux/mutex.h>
 #include <linux/delay.h>
 
@@ -194,6 +197,7 @@ struct adv7180_state {
 	v4l2_std_id		curr_norm;
 	bool			autodetect;
 	bool			powered;
+	bool 			streaming;
 	u8			input;
 
 	struct i2c_client	*client;
@@ -602,6 +606,8 @@ static int adv7180_mbus_fmt(struct v4l2_subdev *sd,
 	fmt->code = MEDIA_BUS_FMT_UYVY8_2X8;
 	fmt->colorspace = V4L2_COLORSPACE_SMPTE170M;
 	fmt->width = 720;
+	
+	//printk("!!! kb-oberon !!! %s:%s:%d: curr_norm=%llx\n", __FILE__, __FUNCTION__, __LINE__, state->curr_norm);
 	fmt->height = state->curr_norm & V4L2_STD_525_60 ? 480 : 576;
 
 	return 0;
@@ -720,22 +726,72 @@ static int adv7180_g_mbus_config(struct v4l2_subdev *sd,
 /* kb-oberon */	
 static int adv7180_s_stream(struct v4l2_subdev *sd, int enable)
 {
+	struct adv7180_state *state = to_state(sd);
+	int ret;
+
+	/* It's always safe to stop streaming, no need to take the lock */
+	if (!enable) {
+		state->streaming = enable;
+		return 0;
+	}
+
+	/* Must wait until querystd released the lock */
+	ret = mutex_lock_interruptible(&state->mutex);
+	if (ret)
+		return ret;
+	state->streaming = enable;
+	mutex_unlock(&state->mutex);
+
 	return 0;
 }
 
 /* kb-oberon */	
+#define OB_WH_MAX 2
+int ob_wh[OB_WH_MAX][2] = {{720, 480}, {720, 576}};
 static int adv7180_enum_frame_size(struct v4l2_subdev *sd,
 				   struct v4l2_subdev_pad_config *cfg,
 				   struct v4l2_subdev_frame_size_enum *fse)
 {
-	fse->min_width  = 720;
+	if (fse->index >= OB_WH_MAX)
+		return -EINVAL;
+
+	fse->min_width  = ob_wh[fse->index][0];
 	fse->max_width  = fse->min_width;
-	fse->max_height = 576;
+	fse->max_height = ob_wh[fse->index][1];
 	fse->min_height = fse->max_height;
 
 	return 0;
 }
+/* kb-oberon */	
+#define OB_IV_MAX 2
+int ob_iv[OB_IV_MAX] = {25, 30};
+static int adv7180_enum_frame_interval(struct v4l2_subdev *sd,
+				   	struct v4l2_subdev_pad_config *cfg,
+				   	struct v4l2_subdev_frame_interval_enum *fie)
+{
+	if (fie->index >= OB_IV_MAX)
+		return -EINVAL;
 
+	fie->interval.numerator = 1;
+	fie->interval.denominator = ob_iv[fie->index];
+
+	return 0;
+}
+
+/* kb-oberon */	
+static int adv7180_subscribe_event(struct v4l2_subdev *sd,
+				   struct v4l2_fh *fh,
+				   struct v4l2_event_subscription *sub)
+{
+	switch (sub->type) {
+	case V4L2_EVENT_SOURCE_CHANGE:
+		return v4l2_src_change_event_subdev_subscribe(sd, fh, sub);
+	case V4L2_EVENT_CTRL:
+		return v4l2_ctrl_subdev_subscribe_event(sd, fh, sub);
+	default:
+		return -EINVAL;
+	}
+}
 
 static const struct v4l2_subdev_video_ops adv7180_video_ops = {
 	.s_std = adv7180_s_std,
@@ -749,13 +805,16 @@ static const struct v4l2_subdev_video_ops adv7180_video_ops = {
 
 static const struct v4l2_subdev_core_ops adv7180_core_ops = {
 	.s_power = adv7180_s_power,
+	.subscribe_event = adv7180_subscribe_event,  	/* kb-oberon */	
+	.unsubscribe_event = v4l2_event_subdev_unsubscribe, 	/* kb-oberon */	
 };
 
 static const struct v4l2_subdev_pad_ops adv7180_pad_ops = {
 	.enum_mbus_code = adv7180_enum_mbus_code,
 	.set_fmt = adv7180_set_pad_format,
 	.get_fmt = adv7180_get_pad_format,
-	.enum_frame_size = adv7180_enum_frame_size,	/* kb-oberon */	
+	.enum_frame_size = adv7180_enum_frame_size,		/* kb-oberon */	
+	.enum_frame_interval = adv7180_enum_frame_interval,	/* kb-oberon */	
 };
 
 static const struct v4l2_subdev_ops adv7180_ops = {

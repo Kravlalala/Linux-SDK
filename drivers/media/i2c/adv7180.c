@@ -607,7 +607,6 @@ static int adv7180_mbus_fmt(struct v4l2_subdev *sd,
 	fmt->colorspace = V4L2_COLORSPACE_SMPTE170M;
 	fmt->width = 720;
 	
-	//printk("!!! kb-oberon !!! %s:%s:%d: curr_norm=%llx\n", __FILE__, __FUNCTION__, __LINE__, state->curr_norm);
 	fmt->height = state->curr_norm & V4L2_STD_525_60 ? 480 : 576;
 
 	return 0;
@@ -1197,7 +1196,7 @@ static int init_device(struct adv7180_state *state)
 	mutex_lock(&state->mutex);
 
 	adv7180_write(state, ADV7180_REG_PWR_MAN, ADV7180_PWR_MAN_RES);
-	usleep_range(2000, 10000);
+	usleep_range(5000, 10000);
 
 	ret = state->chip_info->init(state);
 	if (ret)
@@ -1263,7 +1262,9 @@ static int adv7180_probe(struct i2c_client *client,
 		return -ENOMEM;
 
 	state->client = client;
+
 	state->field = V4L2_FIELD_ALTERNATE;
+
 	state->chip_info = (struct adv7180_chip_info *)id->driver_data;
 
 	if (state->chip_info->flags & ADV7180_FLAG_MIPI_CSI2) {

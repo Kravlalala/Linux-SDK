@@ -71,6 +71,8 @@ MODULE_PARM_DESC(debug, "debug level (0-8)");
 
 #define vip_dbg(level, dev, fmt, arg...)	\
 		v4l2_dbg(level, debug, &dev->v4l2_dev, fmt, ##arg)
+		//v4l2_info(&dev->v4l2_dev, fmt, ##arg)
+
 #define vip_err(dev, fmt, arg...)	\
 		v4l2_err(&dev->v4l2_dev, fmt, ##arg)
 #define vip_info(dev, fmt, arg...)	\
@@ -373,6 +375,7 @@ static enum vip_csc_state vip_csc_direction(u32 src_code, u32 dst_fourcc)
 #define FLAG_MULTIPLEXED	BIT(5)
 #define FLAG_MULT_PORT		BIT(6)
 #define FLAG_MULT_ANC		BIT(7)
+#define FLAG_WEAVE_DEI		BIT(8)  /* kb-oberon */
 
 /*
  * Function prototype declarations
@@ -785,10 +788,15 @@ static int add_out_dtd(struct vip_stream *stream, int srce_type)
 	 */
 	stream->vpdma_channels[channel] = 1;
 
+	/* kb-oberon */
+	if (port->flags & FLAG_WEAVE_DEI) {
+		flags |= VPDMA_DATA_EVEN_LINE_SKIP;
+		flags |= VPDMA_DATA_ODD_LINE_SKIP;
+	}
+
 	vpdma_rawchan_add_out_dtd(&stream->desc_list, c_rect->width, c_rect,
 				  fmt->vpdma_fmt[plane], dma_addr,
 				  max_width, max_height, channel, flags);
-
 	return 0;
 }
 
@@ -902,6 +910,15 @@ static void start_dma(struct vip_stream *stream, struct vip_buffer *buf)
 
 	if (buf) {
 		dma_addr = vb2_dma_contig_plane_dma_addr(&buf->vb.vb2_buf, 0);
+
+		/* kb-oberon */
+		if (stream->port->flags & FLAG_WEAVE_DEI) {
+			u32 stride = dev->ports[0]->c_rect.width * 2;
+
+			if (stream->field == V4L2_FIELD_BOTTOM)
+				dma_addr += stride;
+		}
+
 		drop_data = 0;
 		vip_dbg(4, dev, "start_dma: vb2 buf idx:%d, dma_addr:0x%08x\n",
 			buf->vb.vb2_buf.index, dma_addr);
@@ -946,11 +963,22 @@ static void vip_schedule_next_buffer(struct vip_stream *stream)
 		list_move_tail(&buf->list, &stream->post_bufs);
 		buf = NULL;
 	} else {
-		buf = list_entry(stream->vidq.next,
-				 struct vip_buffer, list);
-		buf->drop = false;
-		list_move_tail(&buf->list, &stream->post_bufs);
-		vip_dbg(4, dev, "added next buffer\n");
+		if (stream->port->flags & FLAG_WEAVE_DEI) {	/* kb-oberon */
+			buf = list_entry(stream->vidq.next,
+					 struct vip_buffer, list);
+			buf->drop = false;
+			if (stream->field == V4L2_FIELD_BOTTOM) {
+				list_move_tail(&buf->list, &stream->post_bufs);
+				vip_dbg(4, dev, "added next buffer\n");
+			}
+		}
+		else {
+			buf = list_entry(stream->vidq.next,
+					 struct vip_buffer, list);
+			buf->drop = false;
+			list_move_tail(&buf->list, &stream->post_bufs);
+			vip_dbg(4, dev, "added next buffer\n");
+		}
 	}
 
 	spin_unlock_irqrestore(&dev->slock, flags);
@@ -966,7 +994,8 @@ static void vip_process_buffer_complete(struct vip_stream *stream)
 
 	buf = list_first_entry(&stream->post_bufs, struct vip_buffer, list);
 
-	if (stream->port->flags & FLAG_INTERLACED) {
+	//if (stream->port->flags & FLAG_INTERLACED) {
+	if (stream->port->flags & (FLAG_INTERLACED | FLAG_WEAVE_DEI)) {  /* kb-oberon */
 		vpdma_unmap_desc_buf(dev->shared->vpdma,
 				     &stream->desc_list.buf);
 
@@ -991,10 +1020,21 @@ static void vip_process_buffer_complete(struct vip_stream *stream)
 			list_move_tail(&buf->list, &stream->dropq);
 			spin_unlock_irqrestore(&dev->slock, flags);
 		} else {
-			spin_lock_irqsave(&dev->slock, flags);
-			list_del(&buf->list);
-			spin_unlock_irqrestore(&dev->slock, flags);
-			vb2_buffer_done(&vb->vb2_buf, VB2_BUF_STATE_DONE);
+			if (stream->port->flags & FLAG_WEAVE_DEI) {	/* kb-oberon */
+				if (stream->field == V4L2_FIELD_BOTTOM)
+				{
+					spin_lock_irqsave(&dev->slock, flags);
+					list_del(&buf->list);
+					spin_unlock_irqrestore(&dev->slock, flags);
+					vb2_buffer_done(&vb->vb2_buf, VB2_BUF_STATE_DONE);
+				}
+			}
+			else {
+				spin_lock_irqsave(&dev->slock, flags);
+				list_del(&buf->list);
+				spin_unlock_irqrestore(&dev->slock, flags);
+				vb2_buffer_done(&vb->vb2_buf, VB2_BUF_STATE_DONE);
+			}
 		}
 	} else {
 		vip_err(dev, "%s: buf is null!!!\n", __func__);
@@ -1262,7 +1302,7 @@ static irqreturn_t vip_irq(int irq_vip, void *data)
 
 			vip_process_buffer_complete(stream);
 
-			vip_schedule_next_buffer(stream);
+			vip_schedule_next_buffer(stream);				
 
 			irqst &= ~((1 << list_num * 2));
 		}
@@ -1353,8 +1393,6 @@ static int vip_s_std(struct file *file, void *fh, v4l2_std_id std)
 	struct vip_stream *stream = file2stream(file);
 	struct vip_port *port = stream->port;
 	struct vip_dev *dev = port->dev;
-
-	//printk("!!! kb-oberon !!! %s:%s:%d: std=%llx\n", __FILE__, __FUNCTION__, __LINE__, std);
 
 	vip_dbg(1, dev, "s_std: 0x%lx\n", (unsigned long)std);
 
@@ -1511,7 +1549,6 @@ static int vip_calc_format_size(struct vip_port *port,
 		(fmt->vpdma_fmt[0]->depth +
 		 (fmt->coplanar ? fmt->vpdma_fmt[1]->depth : 0)) >> 3;
 
-	// kb-oberon
 	if (   *field == V4L2_FIELD_ALTERNATE
 	    || *field == V4L2_FIELD_INTERLACED ) /* kb-oberon */
 		f->fmt.pix.sizeimage /= 2;		
@@ -1544,8 +1581,8 @@ static int vip_try_fmt_vid_cap(struct file *file, void *priv,
 	int ret, found;
 	enum vip_csc_state csc_direction;
 
-	// kb-oberon
-	f->fmt.pix.field = V4L2_FIELD_INTERLACED; // ALTERNATE;
+	/* kb-oberon */
+	f->fmt.pix.field = V4L2_FIELD_NONE; //INTERLACED; // ALTERNATE;
 
 	vip_dbg(3, dev, "try_fmt fourcc:%s size: %dx%d\n",
 		fourcc_to_str(f->fmt.pix.pixelformat),
@@ -1790,8 +1827,8 @@ static int vip_s_fmt_vid_cap(struct file *file, void *priv,
 		vip_err(dev, "%s queue busy\n", __func__);
 		return -EBUSY;
 	}
-	// kb-oberon
-	f->fmt.pix.field = V4L2_FIELD_INTERLACED; // ALTERNATE;
+	/* kb-oberon */
+	f->fmt.pix.field = V4L2_FIELD_NONE; //INTERLACED; // ALTERNATE;
 
 	/*
 	 * Check if we need the scaler or not
@@ -1843,6 +1880,13 @@ static int vip_s_fmt_vid_cap(struct file *file, void *priv,
 		port->flags |= FLAG_INTERLACED;
 	else
 		port->flags &= ~FLAG_INTERLACED;
+	
+	/* kb-oberon */
+	if (1) {
+		/* When camera is giving interlaced content and application
+		 * asks for the progressive data */
+		port->flags |= FLAG_WEAVE_DEI;
+	}
 
 	vip_dbg(3, dev, "s_fmt fourcc:%s size: %dx%d bpl:%d img_size:%d\n",
 		fourcc_to_str(f->fmt.pix.pixelformat),
@@ -2311,6 +2355,10 @@ static int vip_queue_setup(struct vb2_queue *vq, const void *parg,
 		return -EINVAL;
 
 	*nplanes = 1;
+
+	/* kb-oberon */
+	*nbuffers = 16;
+
 	sizes[0] = stream->sizeimage;
 	alloc_ctxs[0] = dev->alloc_ctx;
 	vip_dbg(1, dev, "get %d buffer(s) of size %d each.\n",
@@ -2521,7 +2569,6 @@ static int vip_start_streaming(struct vb2_queue *vq, unsigned int count)
 
 	if (port->subdev) {
 		ret = v4l2_subdev_call(port->subdev, video, s_stream, 1);
-	
 		if (ret) {
 			vip_dbg(1, dev, "stream on failed in subdev\n");
 			return ret;
@@ -2800,7 +2847,7 @@ static int vip_init_stream(struct vip_stream *stream)
 	f.fmt.pix.pixelformat = fmt->fourcc;
 
 	/* kb-oberon */
-	f.fmt.pix.field = V4L2_FIELD_INTERLACED; // ALTERNATE;
+	f.fmt.pix.field = V4L2_FIELD_NONE; //INTERLACED; // ALTERNATE;
 
 	ret = vip_calc_format_size(port, fmt, &f);
 	
@@ -2924,11 +2971,8 @@ static int vip_setup_parser(struct vip_port *port)
 				sync_type = EMBEDDED_SYNC_2X_MULTIPLEXED_YUV422;
 				break;
 			case 1:
-				sync_type = EMBEDDED_SYNC_SINGLE_YUV422;
-				break;
 			default:
-				sync_type =
-				EMBEDDED_SYNC_LINE_MULTIPLEXED_YUV422;
+				sync_type = EMBEDDED_SYNC_SINGLE_YUV422;
 			}
 			if (endpoint->bus.parallel.pixmux == 0)
 				sync_type =

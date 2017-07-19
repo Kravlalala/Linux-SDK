@@ -1182,16 +1182,29 @@ int pcm186x_probe(struct device *dev, enum pcm186x_type type, int irq,
 		goto err_free_irq;
 	}
 
-	//Change input to VIN2L
+	/* Sel VIN2L */
 	ret = regmap_write(regmap, PCM186X_ADC1_INPUT_SEL_L, 0x02);
 	if (ret) {
-		dev_err(dev, "Error writing device: %d\n", ret);
+		dev_err(dev, "failed to write device: %d\n", ret);
 		return ret;
 	}
-	//Change input to VIN2R
+	/* Sel to VIN2R */
 	ret = regmap_write(regmap, PCM186X_ADC1_INPUT_SEL_R, 0x02);
 	if (ret) {
-		dev_err(dev, "Error writing device: %d\n", ret);
+		dev_err(dev, "failed to write device: %d\n", ret);
+		return ret;
+	}
+
+	/* Set AGC and PGA to auto mapping and +7.5 */
+	ret = regmap_write(regmap, PCM186X_PGA_CTRL, 0xe5);	
+	if (ret) {
+		dev_err(dev, "failed to write device: %d\n", ret);
+		return ret;
+	}
+
+	ret = regmap_write(regmap, PCM186X_PGA_VAL_CH1_L, 0x0e);
+	if (ret) {
+		dev_err(dev, "failed to write device: %d\n", ret);
 		return ret;
 	}
 

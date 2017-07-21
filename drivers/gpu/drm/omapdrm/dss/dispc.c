@@ -3980,6 +3980,9 @@ static int dispc_init_gamma_tables(void)
 static void _omap_dispc_initial_config(void)
 {
 	u32 l;
+	struct omap_dss_cpr_coefs cpr_coefs = {0x04d, 0x096, 0x025, 
+						       			   0x3d5, 0x3ac, 0x085,
+						                   0x084, 0x395, 0x3eb};
 
 	/* Exclusively enable DISPC_CORE_CLK and set divider to 1 */
 	if (dss_has_feature(FEAT_CORE_CLK_DIV)) {
@@ -4019,16 +4022,15 @@ static void _omap_dispc_initial_config(void)
 	if (dss_has_feature(FEAT_MFLAG))
 		dispc_init_mflag();
 
-	/*_CONFIG_KB_OBERON_*/
-	{	struct omap_dss_cpr_coefs cpr_coefs = 
-						      /*http://www.equasys.de/colorconversion.html: ITU-R BT.601*/
-						      {0x084, 0x102, 0x032, 
-						       0x3B4, 0x36b, 0x0E1,
-						       0x0E1, 0x344, 0x3DC};
-		dispc_mgr_set_cpr_coef(OMAP_DSS_CHANNEL_LCD, &cpr_coefs);
-		REG_FLD_MOD(DISPC_CONFIG, 1, 24, 24);
-		REG_FLD_MOD(DISPC_CONFIG, 1, 20, 20);
-	}
+	/* Set color conv coefficients for full range mode. Follow this link to get
+	transform matrix for converting RGB to YCbCr: 
+	http://www.equasys.de/colorconversion.html: ITU-R BT.601. */
+	
+	dispc_mgr_set_cpr_coef(OMAP_DSS_CHANNEL_LCD, &cpr_coefs);
+	REG_FLD_MOD(DISPC_CONFIG, 1, 25, 25);
+	REG_FLD_MOD(DISPC_CONFIG, 1, 24, 24);
+	REG_FLD_MOD(DISPC_CONFIG, 1, 20, 20);
+	
 }
 
 static const struct dispc_features omap24xx_dispc_feats = {
